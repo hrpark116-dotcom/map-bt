@@ -1,0 +1,6 @@
+{
+  "devDependencies": {
+    "unplugin-vue-router": "^0.18.0",
+    "vite-plugin-vue-layouts-next": "^1.3.0"
+  }
+}
