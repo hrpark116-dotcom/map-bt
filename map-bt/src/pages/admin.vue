@@ -10,6 +10,14 @@
           <div class="col-auto">
             <q-btn
               flat
+              color="secondary"
+              label="두상 관리"
+              icon="image"
+              class="q-mr-sm"
+              @click="router.push('/portraits')"
+            />
+            <q-btn
+              flat
               color="primary"
               label="메인으로"
               icon="home"
@@ -21,7 +29,7 @@
         <!-- 게임 설정 -->
         <q-card class="q-mb-md">
           <q-card-section>
-            <div class="text-h6 q-mb-md">게임 설정</div>
+            <div class="text-h6 q-mb-md">설정</div>
 
             <div class="q-mb-md">
               <div class="text-subtitle2 q-mb-xs">최대 스탯 포인트</div>
@@ -36,6 +44,16 @@
               />
             </div>
 
+            <q-separator class="q-my-md" />
+
+            <div class="text-subtitle1 q-mb-sm text-weight-medium">
+              공식 설정
+            </div>
+            <div class="text-caption text-grey-7 q-mb-md">
+              사용 가능: 건강, 힘, 민첩, 방어, 기술, 행운, +, -, *, /, (),
+              숫자d숫자(주사위), 스탯d숫자(예: 건강d5)
+            </div>
+
             <div class="q-mb-md">
               <div class="text-subtitle2 q-mb-xs">체력 공식</div>
               <q-input
@@ -44,10 +62,76 @@
                 dense
                 hint="예시: 건강*5 + 3d5, 4d5 + 건강d5"
               />
-              <div class="text-caption text-grey-7 q-mt-xs">
-                사용 가능: 건강, 힘, 민첩, 방어, 기술, 정신, +, -, *, /, (),
-                숫자d숫자(주사위)
-              </div>
+            </div>
+
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">공격 공식</div>
+              <q-input
+                v-model="attackFormula"
+                outlined
+                dense
+                hint="예시: 힘 + 1d6"
+              />
+            </div>
+
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">방어 공식</div>
+              <q-input
+                v-model="defenseFormula"
+                outlined
+                dense
+                hint="예시: 방어"
+              />
+            </div>
+
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">치유 공식</div>
+              <q-input
+                v-model="healFormula"
+                outlined
+                dense
+                hint="예시: 건강d4"
+              />
+            </div>
+
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">이동 공식</div>
+              <q-input
+                v-model="movementFormula"
+                outlined
+                dense
+                hint="예시: 민첩"
+              />
+            </div>
+
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">도주 공식</div>
+              <q-input
+                v-model="escapeFormula"
+                outlined
+                dense
+                hint="예시: 민첩 + 1d6"
+              />
+            </div>
+
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">점령값 공식</div>
+              <q-input
+                v-model="captureFormula"
+                outlined
+                dense
+                hint="예시: 기술 + 행운"
+              />
+            </div>
+
+            <div class="q-mb-md">
+              <div class="text-subtitle2 q-mb-xs">구역 HP 공식</div>
+              <q-input
+                v-model="zoneHpFormula"
+                outlined
+                dense
+                hint="예시: 50 + 2d10"
+              />
             </div>
 
             <q-btn
@@ -98,7 +182,7 @@
                     건강:{{ props.row.health }} / 힘:{{ props.row.strength }} /
                     민첩:{{ props.row.agility }}<br />
                     방어:{{ props.row.defense }} / 기술:{{ props.row.skill }} /
-                    정신:{{ props.row.mental }}
+                    행운:{{ props.row.luck }}
                   </div>
                   <div class="text-weight-bold">
                     총합: {{ characterStore.calculateStatTotal(props.row) }}
@@ -165,8 +249,9 @@ import { useRouter } from 'vue-router';
 import { useStoreAuth } from 'src/stores/storeAuth';
 import { useStoreCharacter } from 'src/stores/storeCharacter';
 import { useStoreSettings } from 'src/stores/storeSettings';
+import { serviceStorage } from 'src/services/serviceStorage';
 import { useQuasar } from 'quasar';
-import DialogCharacter from 'src/components/dialogCharacter.vue';
+import DialogCharacter from 'src/components/DialogCharacter.vue';
 import DialogCharacterAdmin from 'src/components/DialogCharacterAdmin.vue';
 
 const router = useRouter();
@@ -177,6 +262,13 @@ const $q = useQuasar();
 
 const maxStatPoints = ref(15);
 const hpFormula = ref('건강*5 + 3d5');
+const attackFormula = ref('힘 + 1d6');
+const defenseFormula = ref('방어');
+const healFormula = ref('건강d4');
+const movementFormula = ref('민첩');
+const escapeFormula = ref('민첩 + 1d6');
+const captureFormula = ref('기술 + 행운');
+const zoneHpFormula = ref('50 + 2d10');
 const showCreateDialog = ref(false);
 const showEditDialog = ref(false);
 const selectedCharacter = ref(null);
@@ -222,6 +314,13 @@ watch(
     if (settings) {
       maxStatPoints.value = settings.max_stat_points;
       hpFormula.value = settings.hp_formula;
+      attackFormula.value = settings.attack_formula || '힘 + 1d6';
+      defenseFormula.value = settings.defense_formula || '방어';
+      healFormula.value = settings.heal_formula || '건강d4';
+      movementFormula.value = settings.movement_formula || '민첩';
+      escapeFormula.value = settings.escape_formula || '민첩 + 1d6';
+      captureFormula.value = settings.capture_formula || '기술 + 행운';
+      zoneHpFormula.value = settings.zone_hp_formula || '50 + 2d10';
     }
   },
   { immediate: true },
@@ -257,6 +356,13 @@ async function handleSaveSettings() {
     await settingsStore.updateSettings({
       max_stat_points: maxStatPoints.value,
       hp_formula: hpFormula.value,
+      attack_formula: attackFormula.value,
+      defense_formula: defenseFormula.value,
+      heal_formula: healFormula.value,
+      movement_formula: movementFormula.value,
+      escape_formula: escapeFormula.value,
+      capture_formula: captureFormula.value,
+      zone_hp_formula: zoneHpFormula.value,
     });
 
     // 모든 캐릭터 HP 재계산
@@ -281,8 +387,8 @@ async function handleSaveSettings() {
 
 async function handleCreateCharacter(characterData) {
   try {
+    // 관리자는 본인 계정으로 캐릭터 생성
     await characterStore.createCharacter(
-      characterData.user_id || authStore.user.id,
       characterData,
       settingsStore.settings?.hp_formula || '건강*5 + 3d5',
     );
@@ -309,11 +415,24 @@ function editCharacter(character) {
 
 async function handleUpdateCharacter(characterData) {
   try {
+    // 이미지가 변경되었고 기존 이미지가 스토리지 URL이면 삭제
+    const oldImage = selectedCharacter.value.portrait_url;
+    const newImage = characterData.portrait_url;
+
+    if (
+      oldImage !== newImage &&
+      oldImage &&
+      serviceStorage.isStorageUrl(oldImage)
+    ) {
+      await serviceStorage.deleteImage(oldImage);
+    }
+
     await characterStore.updateCharacter(
       selectedCharacter.value.id,
       characterData,
     );
     await characterStore.loadAllCharacters();
+
     $q.notify({
       type: 'positive',
       message: '캐릭터가 수정되었습니다.',
@@ -338,8 +457,18 @@ function confirmDelete(character) {
     persistent: true,
   }).onOk(async () => {
     try {
+      // 1. 스토리지 이미지 먼저 삭제
+      if (
+        character.portrait_url &&
+        serviceStorage.isStorageUrl(character.portrait_url)
+      ) {
+        await serviceStorage.deleteImage(character.portrait_url);
+      }
+
+      // 2. 캐릭터 삭제
       await characterStore.deleteCharacter(character.id);
       await characterStore.loadAllCharacters();
+
       $q.notify({
         type: 'positive',
         message: '캐릭터가 삭제되었습니다.',
@@ -349,6 +478,7 @@ function confirmDelete(character) {
       $q.notify({
         type: 'negative',
         message: '캐릭터 삭제에 실패했습니다.',
+        caption: error.message,
       });
     }
   });

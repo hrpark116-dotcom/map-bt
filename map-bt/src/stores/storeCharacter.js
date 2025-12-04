@@ -113,7 +113,7 @@ export const useStoreCharacter = defineStore('character', () => {
       character.agility +
       character.defense +
       character.skill +
-      character.mental
+      character.luck
     );
   }
 

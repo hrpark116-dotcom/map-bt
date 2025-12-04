@@ -20,8 +20,25 @@
           </div>
         </div>
 
-        <!-- 캐릭터 생성 버튼 -->
+        <!-- 전투 목록 버튼 -->
         <div class="row q-mb-md">
+          <div class="col">
+            <q-btn
+              color="secondary"
+              label="전투 목록"
+              icon="swords"
+              size="lg"
+              class="full-width"
+              @click="router.push('/battles')"
+            />
+          </div>
+        </div>
+
+        <!-- 캐릭터 생성 버튼 (일반 사용자는 캐릭터가 없을 때만) -->
+        <div
+          v-if="!authStore.isAdmin && characterStore.characters.length === 0"
+          class="row q-mb-md"
+        >
           <div class="col">
             <q-btn
               color="primary"
@@ -35,8 +52,18 @@
         </div>
 
         <!-- 관리자 메뉴 -->
-        <div v-if="authStore.isAdmin" class="row q-mb-md">
-          <div class="col">
+        <div v-if="authStore.isAdmin" class="row q-mb-md q-col-gutter-sm">
+          <div class="col-6">
+            <q-btn
+              color="primary"
+              label="캐릭터 생성"
+              icon="add"
+              size="lg"
+              class="full-width"
+              @click="showCreateDialog = true"
+            />
+          </div>
+          <div class="col-6">
             <q-btn
               color="secondary"
               label="관리자 페이지"
@@ -73,10 +100,18 @@
             class="col-12 col-sm-6 col-md-4"
           >
             <q-card>
-              <q-card-section>
+              <q-card-section class="text-center">
+                <q-avatar size="100px" class="q-mb-md">
+                  <img
+                    v-if="character.portrait_url"
+                    :src="character.portrait_url"
+                    @error="handleImageError"
+                  />
+                  <q-icon v-else name="person" size="60px" />
+                </q-avatar>
                 <div class="text-h6">{{ character.name }}</div>
                 <div class="text-subtitle2 text-grey-7">
-                  {{ character.team }}
+                  {{ character.faction }}
                 </div>
               </q-card-section>
 
@@ -89,7 +124,7 @@
                   <div class="col-6">민첩: {{ character.agility }}</div>
                   <div class="col-6">방어: {{ character.defense }}</div>
                   <div class="col-6">기술: {{ character.skill }}</div>
-                  <div class="col-6">정신: {{ character.mental }}</div>
+                  <div class="col-6">행운: {{ character.luck }}</div>
                 </div>
 
                 <q-separator class="q-my-sm" />
@@ -147,8 +182,9 @@ import { useRouter } from 'vue-router';
 import { useStoreAuth } from 'src/stores/storeAuth';
 import { useStoreCharacter } from 'src/stores/storeCharacter';
 import { useStoreSettings } from 'src/stores/storeSettings';
+import { serviceStorage } from 'src/services/serviceStorage';
 import { useQuasar } from 'quasar';
-import DialogCharacter from 'src/components/dialogCharacter.vue';
+import DialogCharacter from 'src/components/DialogCharacter.vue';
 
 const router = useRouter();
 const authStore = useStoreAuth();
@@ -196,6 +232,15 @@ async function handleSignOut() {
 
 async function handleCreateCharacter(characterData) {
   try {
+    // 일반 사용자는 캐릭터 1개 제한
+    if (!authStore.isAdmin && characterStore.characters.length >= 1) {
+      $q.notify({
+        type: 'warning',
+        message: '캐릭터는 1개만 생성할 수 있습니다.',
+      });
+      return;
+    }
+
     await characterStore.createCharacter(
       characterData,
       settingsStore.settings?.hp_formula || '건강*5 + 3d5',
@@ -222,8 +267,21 @@ function editCharacter(character) {
 
 async function handleUpdateCharacter(characterData) {
   try {
+    // 이미지가 변경되었고 기존 이미지가 스토리지 URL이면 삭제
+    const oldImage = selectedCharacter.value.portrait_url;
+    const newImage = characterData.portrait_url;
+
+    if (
+      oldImage !== newImage &&
+      oldImage &&
+      serviceStorage.isStorageUrl(oldImage)
+    ) {
+      await serviceStorage.deleteImage(oldImage);
+    }
+
     const { current_hp, max_hp, ...updates } = characterData;
     await characterStore.updateCharacter(selectedCharacter.value.id, updates);
+
     $q.notify({
       type: 'positive',
       message: '캐릭터가 수정되었습니다.',
@@ -248,7 +306,17 @@ function confirmDelete(character) {
     persistent: true,
   }).onOk(async () => {
     try {
+      // 1. 스토리지 이미지 먼저 삭제
+      if (
+        character.portrait_url &&
+        serviceStorage.isStorageUrl(character.portrait_url)
+      ) {
+        await serviceStorage.deleteImage(character.portrait_url);
+      }
+
+      // 2. 캐릭터 삭제
       await characterStore.deleteCharacter(character.id);
+
       $q.notify({
         type: 'positive',
         message: '캐릭터가 삭제되었습니다.',
@@ -258,8 +326,14 @@ function confirmDelete(character) {
       $q.notify({
         type: 'negative',
         message: '캐릭터 삭제에 실패했습니다.',
+        caption: error.message,
       });
     }
   });
+}
+
+function handleImageError(event) {
+  console.error('이미지 로드 실패:', event.target.src);
+  event.target.style.display = 'none';
 }
 </script>

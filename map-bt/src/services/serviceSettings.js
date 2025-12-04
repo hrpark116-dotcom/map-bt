@@ -52,26 +52,39 @@ export const serviceSettings = {
 
   // HP 공식 검증
   validateHPFormula(formula) {
-    const validStats = ['건강', '힘', '민첩', '방어', '기술', '정신'];
-    const dicePattern = /\d+d\d+/g;
-    const operatorPattern = /[+\-*/()]/g;
-    const numberPattern = /\d+/g;
+    const validStats = ['건강', '힘', '민첩', '방어', '기술', '행운'];
 
     // 공식에서 모든 유효한 요소 제거
     let test = formula;
+
+    // 1. 스탯d숫자 형식 제거 (예: 건강d4, 힘d6)
+    validStats.forEach(stat => {
+      const statDicePattern = new RegExp(`${stat}d\\d+`, 'g');
+      test = test.replace(statDicePattern, '');
+    });
+
+    // 2. 스탯명 제거
     validStats.forEach(stat => {
       test = test.replace(new RegExp(stat, 'g'), '');
     });
-    test = test.replace(dicePattern, '');
-    test = test.replace(operatorPattern, '');
-    test = test.replace(numberPattern, '');
+
+    // 3. 일반 주사위 표기 제거 (예: 3d5, 2d6)
+    test = test.replace(/\d+d\d+/g, '');
+
+    // 4. 연산자 제거
+    test = test.replace(/[+\-*/()]/g, '');
+
+    // 5. 숫자 제거
+    test = test.replace(/\d+/g, '');
+
+    // 6. 공백 제거
     test = test.replace(/\s/g, '');
 
     // 남은 문자가 있으면 유효하지 않은 공식
     if (test.length > 0) {
       return {
         valid: false,
-        error: '유효하지 않은 문자가 포함되어 있습니다.',
+        error: `유효하지 않은 문자가 포함되어 있습니다: "${test}"`,
       };
     }
 

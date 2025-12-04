@@ -3,46 +3,79 @@ import { supabase } from 'boot/supabase';
 export const serviceCharacter = {
   // 주사위 굴리기 함수
   rollDice(diceNotation) {
-    const [count, sides] = diceNotation.split('d').map(Number);
-    let sum = 0;
-    for (let i = 0; i < count; i++) {
-      sum += Math.floor(Math.random() * sides) + 1;
+    try {
+      const parts = String(diceNotation).toLowerCase().split('d');
+      if (parts.length !== 2) {
+        console.error('잘못된 주사위 표기:', diceNotation);
+        return 1;
+      }
+
+      const count = parseInt(parts[0], 10);
+      const sides = parseInt(parts[1], 10);
+
+      if (isNaN(count) || isNaN(sides) || count < 1 || sides < 1) {
+        console.error('잘못된 주사위 값:', diceNotation);
+        return 1;
+      }
+
+      let sum = 0;
+      for (let i = 0; i < count; i++) {
+        sum += Math.floor(Math.random() * sides) + 1;
+      }
+      return sum;
+    } catch (error) {
+      console.error('주사위 굴리기 오류:', error, diceNotation);
+      return 1;
     }
-    return sum;
   },
 
   // HP 공식 계산
   calculateHP(formula, stats) {
-    let result = formula;
+    // 공식을 문자열로 확실히 변환
+    let result = String(formula);
 
     // 스탯 이름을 값으로 치환
     const statMap = {
-      건강: stats.health,
-      힘: stats.strength,
-      민첩: stats.agility,
-      방어: stats.defense,
-      기술: stats.skill,
-      정신: stats.mental,
+      건강: stats.health || 1,
+      힘: stats.strength || 1,
+      민첩: stats.agility || 1,
+      방어: stats.defense || 1,
+      기술: stats.skill || 1,
+      행운: stats.luck || 1,
     };
 
-    // 스탯 이름을 숫자로 치환
+    // 스탯d숫자 형식 먼저 처리 (예: 건강d5 -> 3d5 if 건강=3)
+    for (const [name, value] of Object.entries(statMap)) {
+      const statDicePattern = new RegExp(`${name}d(\\d+)`, 'g');
+      result = result.replace(statDicePattern, (match, sides) => {
+        return `${value}d${sides}`;
+      });
+    }
+
+    // 남은 스탯 이름을 숫자로 치환
     for (const [name, value] of Object.entries(statMap)) {
       result = result.replace(new RegExp(name, 'g'), value);
     }
 
-    // 주사위 표기법 처리 (예: 3d5, 4d6)
+    // 주사위 표기법을 실제 굴린 결과로 치환 (예: 3d5, 4d6)
     const dicePattern = /(\d+)d(\d+)/g;
-    let match;
-    while ((match = dicePattern.exec(result)) !== null) {
-      const diceResult = this.rollDice(match[0]);
-      result = result.replace(match[0], diceResult);
-    }
+    result = result.replace(dicePattern, match => {
+      return this.rollDice(match);
+    });
 
     // 수식 계산
     try {
-      return Math.max(1, Math.floor(eval(result)));
+      const finalResult = eval(result);
+      return Math.max(1, Math.floor(finalResult));
     } catch (error) {
-      console.error('HP 계산 오류:', error);
+      console.error(
+        'HP 계산 오류:',
+        error,
+        '공식:',
+        formula,
+        '계산식:',
+        result,
+      );
       return 100; // 기본값
     }
   },
@@ -56,13 +89,14 @@ export const serviceCharacter = {
       .insert({
         user_id: userId,
         name: characterData.name,
-        team: characterData.team,
+        faction: characterData.faction,
+        portrait_url: characterData.portrait_url || null,
         health: characterData.health,
         strength: characterData.strength,
         agility: characterData.agility,
         defense: characterData.defense,
         skill: characterData.skill,
-        mental: characterData.mental,
+        luck: characterData.luck,
         max_hp: maxHp,
         current_hp: maxHp,
       })
@@ -144,7 +178,7 @@ export const serviceCharacter = {
         agility: char.agility,
         defense: char.defense,
         skill: char.skill,
-        mental: char.mental,
+        luck: char.luck,
       });
 
       // 현재 HP 비율 유지
