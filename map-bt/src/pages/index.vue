@@ -113,6 +113,15 @@
                 <div class="text-subtitle2 text-grey-7">
                   {{ character.faction }}
                 </div>
+                <q-chip
+                  :color="getStatusColor(character.status)"
+                  text-color="white"
+                  size="sm"
+                  :icon="getStatusIcon(character.status)"
+                  class="q-mt-sm"
+                >
+                  {{ character.status || '일반' }}
+                </q-chip>
               </q-card-section>
 
               <q-separator />
@@ -335,5 +344,29 @@ function confirmDelete(character) {
 function handleImageError(event) {
   console.error('이미지 로드 실패:', event.target.src);
   event.target.style.display = 'none';
+}
+
+// 상태 아이콘 반환
+function getStatusIcon(status) {
+  const icons = {
+    일반: 'person',
+    대기중: 'schedule',
+    전투중: 'swords',
+    점령중: 'flag',
+    사망: 'heart_broken',
+  };
+  return icons[status] || 'person';
+}
+
+// 상태 색상 반환
+function getStatusColor(status) {
+  const colors = {
+    일반: 'grey',
+    대기중: 'blue',
+    전투중: 'red',
+    점령중: 'orange',
+    사망: 'black',
+  };
+  return colors[status] || 'grey';
 }
 </script>

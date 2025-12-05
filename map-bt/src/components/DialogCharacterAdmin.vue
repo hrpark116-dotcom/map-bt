@@ -96,6 +96,24 @@
           :rules="[val => !!val || '진영을 선택하세요']"
         />
 
+        <!-- 상태 선택 (관리자 전용) -->
+        <q-select
+          v-model="formData.status"
+          :options="statusOptions"
+          label="상태 *"
+          outlined
+          dense
+          class="q-mb-md"
+          :rules="[val => !!val || '상태를 선택하세요']"
+        >
+          <template v-slot:prepend>
+            <q-icon
+              :name="getStatusIcon(formData.status)"
+              :color="getStatusColor(formData.status)"
+            />
+          </template>
+        </q-select>
+
         <!-- 스탯 조절 -->
         <div class="text-subtitle2 q-mb-sm">
           스탯 포인트: {{ currentStatTotal }} / {{ maxStatPoints }}
@@ -265,6 +283,7 @@ const emit = defineEmits(['update:modelValue', 'save']);
 const $q = useQuasar();
 
 const factionOptions = ['불사조 기사단', '데스이터'];
+const statusOptions = ['일반', '대기중', '전투중', '점령중', '사망'];
 
 const stats = [
   { key: 'health', label: '건강' },
@@ -278,6 +297,7 @@ const stats = [
 const formData = ref({
   name: '',
   faction: '',
+  status: '일반',
   portrait_url: '',
   health: 1,
   strength: 1,
@@ -329,6 +349,7 @@ watch(
       formData.value = {
         name: newCharacter.name,
         faction: newCharacter.faction,
+        status: newCharacter.status || '일반',
         portrait_url: newCharacter.portrait_url || '',
         health: newCharacter.health,
         strength: newCharacter.strength,
@@ -362,6 +383,7 @@ function resetForm() {
     formData.value = {
       name: '',
       faction: '',
+      status: '일반',
       portrait_url: '',
       health: 1,
       strength: 1,
@@ -433,5 +455,29 @@ async function openGallery() {
 function handleSave() {
   if (!isFormValid.value) return;
   emit('save', { ...formData.value });
+}
+
+// 상태 아이콘 반환
+function getStatusIcon(status) {
+  const icons = {
+    일반: 'person',
+    대기중: 'schedule',
+    전투중: 'swords',
+    점령중: 'flag',
+    사망: 'heart_broken',
+  };
+  return icons[status] || 'person';
+}
+
+// 상태 색상 반환
+function getStatusColor(status) {
+  const colors = {
+    일반: 'grey',
+    대기중: 'blue',
+    전투중: 'red',
+    점령중: 'orange',
+    사망: 'black',
+  };
+  return colors[status] || 'grey';
 }
 </script>
