@@ -309,3 +309,26 @@ USING (
   bucket_id = 'game-assets' 
   AND auth.role() = 'authenticated'
 );
+
+-- battles 테이블에 전투 설정 컬럼 추가
+
+ALTER TABLE battles
+ADD COLUMN IF NOT EXISTS grid_size INTEGER DEFAULT 6 CHECK (grid_size >= 3 AND grid_size <= 10),
+ADD COLUMN IF NOT EXISTS battle_time INTEGER DEFAULT 60 CHECK (battle_time >= 10 AND battle_time <= 180),
+ADD COLUMN IF NOT EXISTS turn_time_limit INTEGER DEFAULT 60 CHECK (turn_time_limit >= 30 AND turn_time_limit <= 300),
+ADD COLUMN IF NOT EXISTS battle_bgm TEXT;
+
+-- 기존 데이터에 기본값 설정
+UPDATE battles
+SET 
+  grid_size = COALESCE(grid_size, 6),
+  battle_time = COALESCE(battle_time, 60),
+  turn_time_limit = COALESCE(turn_time_limit, 60),
+  battle_bgm = COALESCE(battle_bgm, '')
+WHERE grid_size IS NULL 
+   OR battle_time IS NULL 
+   OR turn_time_limit IS NULL 
+   OR battle_bgm IS NULL;
+
+-- 인덱스 추가 (선택사항)
+CREATE INDEX IF NOT EXISTS idx_battles_grid_size ON battles(grid_size);

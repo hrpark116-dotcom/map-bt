@@ -44,56 +44,6 @@
               />
             </div>
 
-            <div class="q-mb-md">
-              <div class="text-subtitle2 q-mb-xs">구역 크기</div>
-              <q-slider
-                v-model="gridSize"
-                :min="3"
-                :max="10"
-                :step="1"
-                markers
-                label
-                label-always
-                color="primary"
-                class="q-mb-sm"
-              />
-              <div class="text-caption text-grey-7 q-mb-md">
-                {{ gridSize }}x{{ gridSize }} 그리드 (총
-                {{ gridSize * gridSize }}칸)
-              </div>
-
-              <!-- 그리드 미리보기 -->
-              <div class="q-mb-sm text-caption text-weight-bold">미리보기:</div>
-              <div
-                class="grid-preview"
-                :style="{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-                  gap: '2px',
-                  maxWidth: '300px',
-                  backgroundColor: '#ccc',
-                  padding: '2px',
-                  borderRadius: '4px',
-                }"
-              >
-                <div
-                  v-for="i in gridSize * gridSize"
-                  :key="i"
-                  :style="{
-                    aspectRatio: '1',
-                    backgroundColor: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '10px',
-                    color: '#999',
-                  }"
-                >
-                  {{ i }}
-                </div>
-              </div>
-            </div>
-
             <q-separator class="q-my-md" />
 
             <div class="text-subtitle1 q-mb-sm text-weight-medium">
@@ -324,7 +274,6 @@ const settingsStore = useStoreSettings();
 const $q = useQuasar();
 
 const maxStatPoints = ref(15);
-const gridSize = ref(6);
 const hpFormula = ref('건강*5 + 3d5');
 const attackFormula = ref('힘 + 1d6');
 const defenseFormula = ref('방어');
@@ -390,7 +339,6 @@ watch(
   settings => {
     if (settings) {
       maxStatPoints.value = settings.max_stat_points;
-      gridSize.value = settings.grid_size || 6;
       hpFormula.value = settings.hp_formula;
       attackFormula.value = settings.attack_formula || '힘 + 1d6';
       defenseFormula.value = settings.defense_formula || '방어';
@@ -433,7 +381,6 @@ async function handleSaveSettings() {
     // 설정 저장
     await settingsStore.updateSettings({
       max_stat_points: maxStatPoints.value,
-      grid_size: gridSize.value,
       hp_formula: hpFormula.value,
       attack_formula: attackFormula.value,
       defense_formula: defenseFormula.value,
