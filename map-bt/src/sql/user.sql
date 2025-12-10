@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS characters (
   luck INTEGER NOT NULL DEFAULT 1 CHECK (luck >= 1 AND luck <= 5),
   current_hp INTEGER NOT NULL DEFAULT 100,
   max_hp INTEGER NOT NULL DEFAULT 100,
-  status TEXT NOT NULL DEFAULT '일반' CHECK (status IN ('일반', '대기중', '전투중', '점령중', '사망')),
+  status TEXT NOT NULL DEFAULT '일반' CHECK (status IN ('일반', '전투중', '사망')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

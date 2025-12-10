@@ -389,12 +389,13 @@ async function startBattle(battleId) {
   $q.dialog({
     title: '전투 시작',
     message:
-      '전투를 시작하시겠습니까? 전투가 시작되면 참가자들이 전투방에 입장할 수 있습니다.',
+      '전투를 시작하시겠습니까? 전투가 시작되면 전장 구역이 생성되고 참가자들이 전투방에 입장할 수 있습니다.',
     cancel: true,
     persistent: true,
   }).onOk(async () => {
     try {
-      await battleStore.changeBattleStatus(battleId, 'in_progress');
+      // startBattle 호출 (전장 구역 생성 포함)
+      await battleStore.startBattle(battleId);
       $q.notify({
         type: 'positive',
         message: '전투가 시작되었습니다!',

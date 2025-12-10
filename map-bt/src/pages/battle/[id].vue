@@ -86,7 +86,21 @@
                           위치 미선택
                         </q-badge>
 
-                        <!-- 관리자 위치 설정 버튼 -->
+                        <!-- 준비 완료 상태 -->
+                        <q-badge
+                          v-if="participant.ready_confirmed"
+                          color="blue"
+                          class="q-mt-xs"
+                        >
+                          <q-icon
+                            name="check_circle"
+                            size="xs"
+                            class="q-mr-xs"
+                          />
+                          준비 완료
+                        </q-badge>
+
+                        <!-- 관리자: 위치 설정 + 준비 완료 버튼 -->
                         <div v-if="authStore.isAdmin" class="q-mt-xs">
                           <q-btn
                             flat
@@ -94,8 +108,22 @@
                             size="xs"
                             color="primary"
                             icon="grid_on"
-                            label="위치 설정"
+                            label="위치"
                             @click="handleAdminSetPosition(participant)"
+                          />
+                          <q-btn
+                            v-if="
+                              participant.position_set &&
+                              !participant.ready_confirmed
+                            "
+                            flat
+                            dense
+                            size="xs"
+                            color="positive"
+                            icon="check"
+                            label="준비"
+                            @click="handleConfirmReady(participant.id)"
+                            class="q-ml-xs"
                           />
                         </div>
                       </q-card-section>
@@ -154,7 +182,21 @@
                           위치 미선택
                         </q-badge>
 
-                        <!-- 관리자 위치 설정 버튼 -->
+                        <!-- 준비 완료 상태 -->
+                        <q-badge
+                          v-if="participant.ready_confirmed"
+                          color="blue"
+                          class="q-mt-xs"
+                        >
+                          <q-icon
+                            name="check_circle"
+                            size="xs"
+                            class="q-mr-xs"
+                          />
+                          준비 완료
+                        </q-badge>
+
+                        <!-- 관리자: 위치 설정 + 준비 완료 버튼 -->
                         <div v-if="authStore.isAdmin" class="q-mt-xs">
                           <q-btn
                             flat
@@ -162,8 +204,22 @@
                             size="xs"
                             color="primary"
                             icon="grid_on"
-                            label="위치 설정"
+                            label="위치"
                             @click="handleAdminSetPosition(participant)"
+                          />
+                          <q-btn
+                            v-if="
+                              participant.position_set &&
+                              !participant.ready_confirmed
+                            "
+                            flat
+                            dense
+                            size="xs"
+                            color="positive"
+                            icon="check"
+                            label="준비"
+                            @click="handleConfirmReady(participant.id)"
+                            class="q-ml-xs"
                           />
                         </div>
                       </q-card-section>
@@ -195,6 +251,7 @@
 
                   <!-- 참여 후 버튼들 -->
                   <template v-if="isParticipating">
+                    <!-- 전투방 입장 (전투 중) -->
                     <q-btn
                       v-if="battle.status === 'in_progress'"
                       color="positive"
@@ -203,6 +260,8 @@
                       class="full-width"
                       @click="enterBattleRoom"
                     />
+
+                    <!-- 시작위치 설정 (대기 중) -->
                     <q-btn
                       v-if="battle.status === 'waiting'"
                       color="orange"
@@ -212,6 +271,37 @@
                       :disable="isActionDisabled"
                       @click="showBattlefieldDialog = true"
                     />
+
+                    <!-- 준비 완료 버튼 (위치 설정 후 && 아직 준비 안함) -->
+                    <q-btn
+                      v-if="
+                        battle.status === 'waiting' &&
+                        myParticipation?.position_set &&
+                        !myParticipation?.ready_confirmed
+                      "
+                      color="positive"
+                      label="준비 완료"
+                      icon="check_circle"
+                      class="full-width"
+                      @click="handleConfirmReady(myParticipation.id)"
+                    />
+
+                    <!-- 준비 완료됨 표시 -->
+                    <q-banner
+                      v-if="
+                        battle.status === 'waiting' &&
+                        myParticipation?.ready_confirmed
+                      "
+                      class="bg-blue text-white"
+                      rounded
+                    >
+                      <template v-slot:avatar>
+                        <q-icon name="check_circle" color="white" />
+                      </template>
+                      준비 완료! 관리자가 전투를 시작할 때까지 대기해주세요.
+                    </q-banner>
+
+                    <!-- 참여 취소 (대기 중) -->
                     <q-btn
                       v-if="battle.status === 'waiting'"
                       color="negative"
@@ -615,6 +705,29 @@ function canSeePosition(participant) {
   );
 }
 
+function isMyParticipant(participant) {
+  if (!authStore.user || !myParticipation.value) return false;
+  return participant.id === myParticipation.value.id;
+}
+
+async function handleConfirmReady(participantId) {
+  try {
+    await battleStore.confirmBattleStart(participantId);
+    $q.notify({
+      type: 'positive',
+      message: '준비 완료!',
+      icon: 'check_circle',
+    });
+  } catch (error) {
+    console.error('준비 완료 오류:', error);
+    $q.notify({
+      type: 'negative',
+      message: '준비 완료에 실패했습니다.',
+      caption: error.message,
+    });
+  }
+}
+
 async function handleSetPosition(position) {
   // 관리자가 다른 참가자 위치 설정 중인지 확인
   const targetParticipant =
@@ -776,16 +889,19 @@ async function handleStartBattle() {
   $q.dialog({
     title: '전투 시작',
     message:
-      '전투를 시작하시겠습니까? 전투가 시작되면 참가자들이 전투방에 입장할 수 있습니다.',
+      '전투를 시작하시겠습니까? 전투가 시작되면 전장 구역이 생성되고 참가자들이 전투방에 입장할 수 있습니다.',
     cancel: true,
     persistent: true,
   }).onOk(async () => {
     try {
-      await battleStore.changeBattleStatus(battleId, 'in_progress');
+      // startBattle 호출 (전장 구역 생성 포함)
+      await battleStore.startBattle(battleId);
+
       $q.notify({
         type: 'positive',
         message: '전투가 시작되었습니다!',
       });
+
       await loadData();
     } catch (error) {
       console.error('전투 시작 오류:', error);

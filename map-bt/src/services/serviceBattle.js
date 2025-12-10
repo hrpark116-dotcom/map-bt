@@ -420,7 +420,7 @@ export const serviceBattle = {
     gridSize,
     zoneHpFormula,
     captureFormula,
-    stats = {},
+    avgStats,
   ) {
     const zones = [];
     const columns = 'ABCDEFGHIJ'.split('').slice(0, gridSize);
@@ -430,19 +430,21 @@ export const serviceBattle = {
       for (let col of columns) {
         const position = `${col}${row}`;
 
-        // 구역 HP 계산 (공식 사용)
-        const zoneHp = this.calculateValue(zoneHpFormula, stats);
+        // 구역 max_hp 계산
+        const maxHp = this.calculateValue(zoneHpFormula, avgStats);
 
-        // 점령값 계산 (공식 사용)
-        const capturePoints = this.calculateValue(captureFormula, stats);
+        // 점령 포인트 계산
+        const capturePoints = this.calculateValue(captureFormula, avgStats);
 
         zones.push({
           battle_id: battleId,
           position: position,
+          owner_faction: null,
+          current_hp: 0,
+          max_hp: maxHp,
           capture_points: capturePoints,
-          zone_hp: zoneHp,
-          current_hp: zoneHp,
-          controlled_by: null,
+          last_captured_at: null,
+          last_captured_by: null,
         });
       }
     }
@@ -457,6 +459,7 @@ export const serviceBattle = {
       throw error;
     }
 
+    console.log(`전장 구역 ${data?.length || 0}개 생성됨`);
     return data;
   },
 
@@ -528,14 +531,7 @@ export const serviceBattle = {
       const finalResult = eval(result);
       return Math.max(1, Math.floor(finalResult));
     } catch (error) {
-      console.error(
-        '공식 계산 오류:',
-        error,
-        '공식:',
-        formula,
-        '계산식:',
-        result,
-      );
+      console.error('공식 계산 오류:', formula, '→', result, error);
       return 10; // 기본값
     }
   },
@@ -579,28 +575,91 @@ export const serviceBattle = {
 
   // 전투 시작 (placement -> in_progress)
   async startBattle(battleId) {
-    // 1. 모든 참가자가 확인했는지 체크
-    const { data: participants } = await supabase
-      .from('battle_participants')
-      .select('*')
-      .eq('battle_id', battleId);
+    console.log('🚀 전투 시작:', battleId);
 
-    const allConfirmed = participants?.every(p => p.ready_confirmed) || false;
+    try {
+      // 1. 전투 정보 가져오기
+      const { data: battle, error: battleError } = await supabase
+        .from('battles')
+        .select('*')
+        .eq('id', battleId)
+        .single();
 
-    if (!allConfirmed) {
-      throw new Error('모든 참가자가 확인하지 않았습니다.');
-    }
+      if (battleError) throw battleError;
 
-    // 2. 전투 상태 변경
-    await this.changeBattleStatus(battleId, 'in_progress');
+      // 2. 모든 참가자가 확인했는지 체크
+      const { data: participants, error: participantsError } = await supabase
+        .from('battle_participants')
+        .select('*, characters(*)')
+        .eq('battle_id', battleId);
 
-    // 3. 참가자 캐릭터 상태를 '전투중'으로 변경
-    const characterIds = participants.map(p => p.character_id).filter(id => id);
-    if (characterIds.length > 0) {
-      await supabase
-        .from('characters')
-        .update({ status: '전투중' })
-        .in('id', characterIds);
+      if (participantsError) throw participantsError;
+
+      const allConfirmed = participants?.every(p => p.ready_confirmed) || false;
+
+      if (!allConfirmed) {
+        throw new Error('모든 참가자가 확인하지 않았습니다.');
+      }
+
+      // 3. 게임 설정 가져오기
+      const { data: settings, error: settingsError } = await supabase
+        .from('game_settings')
+        .select('*')
+        .single();
+
+      if (settingsError) {
+        console.warn('게임 설정 조회 실패, 기본값 사용');
+      }
+
+      // 4. 전장 구역 생성 (기존 구역이 없을 경우에만)
+      const { data: existingZones } = await supabase
+        .from('battlefield_zones')
+        .select('id')
+        .eq('battle_id', battleId)
+        .limit(1);
+
+      if (!existingZones || existingZones.length === 0) {
+        console.log('전장 구역 생성 중...');
+
+        // 참가자들의 평균 스탯 계산
+        const allCharacters = participants
+          .map(p => p.characters)
+          .filter(c => c);
+        const avgStats = this.calculateAverageStats(allCharacters);
+
+        const zoneHpFormula = settings?.zone_hp_formula || '건강 + 1d20';
+        const captureFormula = settings?.capture_formula || '기술 + 1d6';
+
+        await this.createBattlefieldZones(
+          battleId,
+          battle.grid_size,
+          zoneHpFormula,
+          captureFormula,
+          avgStats,
+        );
+
+        console.log('✅ 전장 구역 생성 완료');
+      }
+
+      // 5. 전투 상태 변경
+      await this.changeBattleStatus(battleId, 'in_progress');
+
+      // 6. 참가자 캐릭터 상태를 '전투중'으로 변경
+      const characterIds = participants
+        .map(p => p.character_id)
+        .filter(id => id);
+      if (characterIds.length > 0) {
+        await supabase
+          .from('characters')
+          .update({ status: '전투중' })
+          .in('id', characterIds);
+      }
+
+      console.log('✅ 전투 시작 완료');
+      return battle;
+    } catch (error) {
+      console.error('❌ 전투 시작 실패:', error);
+      throw error;
     }
   },
 
@@ -638,5 +697,42 @@ export const serviceBattle = {
     }
 
     return data;
+  },
+
+  // 참가자들의 평균 스탯 계산
+  calculateAverageStats(characters) {
+    if (!characters || characters.length === 0) {
+      return {
+        health: 3,
+        strength: 3,
+        agility: 3,
+        defense: 3,
+        skill: 3,
+        luck: 3,
+      };
+    }
+
+    const total = characters.reduce(
+      (acc, char) => ({
+        health: acc.health + (char.health || 0),
+        strength: acc.strength + (char.strength || 0),
+        agility: acc.agility + (char.agility || 0),
+        defense: acc.defense + (char.defense || 0),
+        skill: acc.skill + (char.skill || 0),
+        luck: acc.luck + (char.luck || 0),
+      }),
+      { health: 0, strength: 0, agility: 0, defense: 0, skill: 0, luck: 0 },
+    );
+
+    const count = characters.length;
+
+    return {
+      health: Math.max(1, Math.round(total.health / count)),
+      strength: Math.max(1, Math.round(total.strength / count)),
+      agility: Math.max(1, Math.round(total.agility / count)),
+      defense: Math.max(1, Math.round(total.defense / count)),
+      skill: Math.max(1, Math.round(total.skill / count)),
+      luck: Math.max(1, Math.round(total.luck / count)),
+    };
   },
 };
